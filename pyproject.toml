@@ -3,7 +3,7 @@ name = "deepstream-yolo"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = "3.12"
 dependencies = [
     "torch<2.6.0",
     "dill",
