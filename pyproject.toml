@@ -11,4 +11,5 @@ dependencies = [
     "onnxslim",
     "onnxruntime",
     "onnxscript",
+    "ultralytics",
 ]
