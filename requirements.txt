@@ -1,0 +1,6 @@
+torch<2.6.0
+dill
+onnx
+onnxslim
+onnxruntime
+onnxscript
