@@ -1,8 +1,10 @@
-# RTMDet (MMYOLO) usage
+# YOLOv10 usage
+
+**NOTE**: The yaml file is not required.
 
 * [Convert model](#convert-model)
 * [Compile the lib](#compile-the-lib)
-* [Edit the config_infer_primary_rtmdet file](#edit-the-config_infer_primary_rtmdet-file)
+* [Edit the config_infer_primary_yoloV10 file](#edit-the-config_infer_primary_yolov10-file)
 * [Edit the deepstream_app_config file](#edit-the-deepstream_app_config-file)
 * [Testing the model](#testing-the-model)
 
@@ -10,17 +12,12 @@
 
 ### Convert model
 
-#### 1. Download the RTMDet (MMYOLO) repo and install the requirements
+#### 1. Download the YOLOv10 repo and install the requirements
 
 ```
-git clone https://github.com/open-mmlab/mmyolo.git
-cd mmyolo
-pip3 install openmim
-mim install "mmengine>=0.6.0"
-mim install "mmcv>=2.0.0rc4,<2.1.0"
-mim install "mmdet>=3.0.0,<4.0.0"
-pip3 install -r requirements/albu.txt
-mim install -v -e .
+git clone https://github.com/ultralytics/ultralytics.git
+cd ultralytics
+pip3 install -e .
 pip3 install onnx onnxslim onnxruntime
 ```
 
@@ -28,24 +25,24 @@ pip3 install onnx onnxslim onnxruntime
 
 #### 2. Copy conversor
 
-Copy the `export_rtmdet.py` file from `DeepStream-Yolo/utils` directory to the `mmyolo` folder.
+Copy the `export_yoloV10.py` file from `DeepStream-Yolo/utils` directory to the `ultralytics` folder.
 
 #### 3. Download the model
 
-Download the `pth` file from [RTMDet (MMYOLO)](https://github.com/open-mmlab/mmyolo/tree/main/configs/rtmdet) releases (example for RTMDet-s*)
+Download the `pt` file from [YOLOv10](https://github.com/THU-MIG/yolov10/releases/tag/v1.1) releases (example for YOLOv10s)
 
 ```
-wget https://download.openmmlab.com/mmrazor/v1/rtmdet_distillation/kd_s_rtmdet_m_neck_300e_coco/kd_s_rtmdet_m_neck_300e_coco_20230220_140647-446ff003.pth
+wget https://github.com/THU-MIG/yolov10/releases/download/v1.1/yolov10s.pt
 ```
 
 **NOTE**: You can use your custom model.
 
 #### 4. Convert model
 
-Generate the ONNX model file (example for RTMDet-s*)
+Generate the ONNX model file (example for YOLOv10s)
 
 ```
-python3 export_rtmdet.py -w kd_s_rtmdet_m_neck_300e_coco_20230220_140647-446ff003.pth -c configs/rtmdet/distillation/kd_s_rtmdet_m_neck_300e_coco.py --dynamic
+python3 export_yoloV10.py -w yolov10s.pt --dynamic
 ```
 
 **NOTE**: To change the inference size (defaut: 640)
@@ -141,14 +138,14 @@ make -C nvdsinfer_custom_impl_Yolo clean && make -C nvdsinfer_custom_impl_Yolo
 
 ##
 
-### Edit the config_infer_primary_rtmdet file
+### Edit the config_infer_primary_yoloV10 file
 
-Edit the `config_infer_primary_rtmdet.txt` file according to your model (example for RTMDet-s* with 80 classes)
+Edit the `config_infer_primary_yoloV10.txt` file according to your model (example for YOLOv10s with 80 classes)
 
 ```
 [property]
 ...
-onnx-file=kd_s_rtmdet_m_neck_300e_coco_20230220_140647-446ff003.pth.onnx
+onnx-file=yolov10s.pt.onnx
 ...
 num-detected-classes=80
 ...
@@ -156,7 +153,7 @@ parse-bbox-func-name=NvDsInferParseYolo
 ...
 ```
 
-**NOTE**: The **RTMDet (MMYOLO)** resizes the input with center padding. To get better accuracy, use
+**NOTE**: The **YOLOv10** resizes the input with center padding. To get better accuracy, use
 
 ```
 [property]
@@ -166,24 +163,12 @@ symmetric-padding=1
 ...
 ```
 
-**NOTE**: The **RTMDet (MMYOLO)** uses BGR color format for the image input. It is important to change the `model-color-format` according to the trained values.
+**NOTE**: The **YOLOv10** do not require NMS. To get better accuracy, use
 
 ```
 [property]
 ...
-model-color-format=1
-...
-```
-
-**NOTE**: The **RTMDet (MMYOLO)** uses normalization on the image preprocess. It is important to change the `net-scale-factor` and `offsets` according to the trained values.
-
-Default: `mean = 0.485, 0.456, 0.406` and `std = 0.229, 0.224, 0.225`
-
-```
-[property]
-...
-net-scale-factor=0.0173520735727919486
-offsets=103.53;116.28;123.675
+cluster-mode=4
 ...
 ```
 
@@ -195,7 +180,7 @@ offsets=103.53;116.28;123.675
 ...
 [primary-gie]
 ...
-config-file=config_infer_primary_rtmdet.txt
+config-file=config_infer_primary_yoloV10.txt
 ```
 
 ##

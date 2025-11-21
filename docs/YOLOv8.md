@@ -32,7 +32,7 @@ Copy the `export_yoloV8.py` file from `DeepStream-Yolo/utils` directory to the `
 Download the `pt` file from [YOLOv8](https://github.com/ultralytics/assets/releases/) releases (example for YOLOv8s)
 
 ```
-wget https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8s.pt
+wget https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8s.pt
 ```
 
 **NOTE**: You can use your custom model.
@@ -109,6 +109,7 @@ export CUDA_VER=XY.Z
 * x86 platform
 
   ```
+  DeepStream 8.0 = 12.8
   DeepStream 7.1 = 12.6
   DeepStream 7.0 / 6.4 = 12.2
   DeepStream 6.3 = 12.1
@@ -122,6 +123,7 @@ export CUDA_VER=XY.Z
 * Jetson platform
 
   ```
+  DeepStream 8.0 = 13.0
   DeepStream 7.1 = 12.6
   DeepStream 7.0 / 6.4 = 12.2
   DeepStream 6.3 / 6.2 / 6.1.1 / 6.1 = 11.4

@@ -1,65 +1,41 @@
 import os
-import sys
 import onnx
 import torch
 import torch.nn as nn
-from copy import deepcopy
+import torch.nn.functional as F
 
-import ultralytics.utils
-import ultralytics.models.yolo
-import ultralytics.utils.tal as _m
-
-sys.modules['ultralytics.yolo'] = ultralytics.models.yolo
-sys.modules['ultralytics.yolo.utils'] = ultralytics.utils
-
-
-def _dist2bbox(distance, anchor_points, xywh=False, dim=-1):
-    lt, rb = distance.chunk(2, dim)
-    x1y1 = anchor_points - lt
-    x2y2 = anchor_points + rb
-    return torch.cat((x1y1, x2y2), dim)
-
-
-_m.dist2bbox.__code__ = _dist2bbox.__code__
+from src.core import YAMLConfig
 
 
 class DeepStreamOutput(nn.Module):
-    def __init__(self):
+    def __init__(self, img_size, use_focal_loss):
         super().__init__()
+        self.img_size = img_size
+        self.use_focal_loss = use_focal_loss
 
     def forward(self, x):
-        x = x.transpose(1, 2)
-        boxes = x[:, :, :4]
-        scores, labels = torch.max(x[:, :, 4:], dim=-1, keepdim=True)
+        boxes = x['pred_boxes']
+        convert_matrix = torch.tensor(
+            [[1, 0, 1, 0], [0, 1, 0, 1], [-0.5, 0, 0.5, 0], [0, -0.5, 0, 0.5]], dtype=boxes.dtype, device=boxes.device
+        )
+        boxes @= convert_matrix
+        boxes *= torch.as_tensor([[*self.img_size]]).flip(1).tile([1, 2]).unsqueeze(1)
+        scores = F.sigmoid(x['pred_logits']) if self.use_focal_loss else F.softmax(x['pred_logits'])[:, :, :-1]
+        scores, labels = torch.max(scores, dim=-1, keepdim=True)
         return torch.cat([boxes, scores, labels.to(boxes.dtype)], dim=-1)
 
 
-def yolov8_export(weights, device, inplace=True, fuse=True):
-    ckpt = torch.load(weights, map_location='cpu')
-    ckpt = (ckpt.get('ema') or ckpt['model']).to(device).float()
-    if not hasattr(ckpt, 'stride'):
-        ckpt.stride = torch.tensor([32.])
-    if hasattr(ckpt, 'names') and isinstance(ckpt.names, (list, tuple)):
-        ckpt.names = dict(enumerate(ckpt.names))
-    model = ckpt.fuse().eval() if fuse and hasattr(ckpt, 'fuse') else ckpt.eval()
-    for m in model.modules():
-        t = type(m)
-        if hasattr(m, 'inplace'):
-            m.inplace = inplace
-        elif t.__name__ == 'Upsample' and not hasattr(m, 'recompute_scale_factor'):
-            m.recompute_scale_factor = None
-    model = deepcopy(model).to(device)
-    for p in model.parameters():
-        p.requires_grad = False
-    model.eval()
-    model.float()
-    model = model.fuse()
-    for k, m in model.named_modules():
-        if m.__class__.__name__ in ('Detect', 'RTDETRDecoder'):
-            m.dynamic = False
-            m.export = True
-            m.format = 'onnx'
-    return model
+def dfine_export(weights, cfg_file, device):
+    cfg = YAMLConfig(cfg_file, resume=weights)
+    if 'HGNetv2' in cfg.yaml_cfg:
+        cfg.yaml_cfg['HGNetv2']['pretrained'] = False
+    checkpoint = torch.load(weights, map_location=device)
+    if 'ema' in checkpoint:
+        state = checkpoint['ema']['module']
+    else:
+        state = checkpoint['model']
+    cfg.model.load_state_dict(state)
+    return cfg.model.deploy(), cfg.postprocessor.use_focal_loss
 
 
 def suppress_warnings():
@@ -76,20 +52,14 @@ def main(args):
 
     print(f'\nStarting: {args.weights}')
 
-    print('Opening YOLOv8 model')
+    print('Opening D-FINE model')
 
     device = torch.device('cpu')
-    model = yolov8_export(args.weights, device)
-
-    if len(model.names.keys()) > 0:
-        print('Creating labels.txt file')
-        with open('labels.txt', 'w', encoding='utf-8') as f:
-            for name in model.names.values():
-                f.write(f'{name}\n')
-
-    model = nn.Sequential(model, DeepStreamOutput())
+    model, use_focal_loss = dfine_export(args.weights, args.config, device)
 
     img_size = args.size * 2 if len(args.size) == 1 else args.size
+
+    model = nn.Sequential(model, DeepStreamOutput(img_size, use_focal_loss))
 
     onnx_input_im = torch.zeros(args.batch, 3, *img_size).to(device)
     onnx_output_file = f'{args.weights}.onnx'
@@ -121,8 +91,9 @@ def main(args):
 
 def parse_args():
     import argparse
-    parser = argparse.ArgumentParser(description='DeepStream YOLOv8 conversion')
-    parser.add_argument('-w', '--weights', required=True, help='Input weights (.pt) file path (required)')
+    parser = argparse.ArgumentParser(description='DeepStream D-FINE conversion')
+    parser.add_argument('-w', '--weights', required=True, help='Input weights (.pth) file path (required)')
+    parser.add_argument('-c', '--config', required=True, help='Input YAML (.yml) file path (required)')
     parser.add_argument('-s', '--size', nargs='+', type=int, default=[640], help='Inference size [H,W] (default [640])')
     parser.add_argument('--opset', type=int, default=17, help='ONNX opset version')
     parser.add_argument('--simplify', action='store_true', help='ONNX simplify model')
@@ -131,6 +102,8 @@ def parse_args():
     args = parser.parse_args()
     if not os.path.isfile(args.weights):
         raise SystemExit('Invalid weights file')
+    if not os.path.isfile(args.config):
+        raise SystemExit('Invalid config file')
     if args.dynamic and args.batch > 1:
         raise SystemExit('Cannot set dynamic batch-size and static batch-size at same time')
     return args
