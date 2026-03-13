@@ -9,6 +9,17 @@ import ultralytics.utils
 import ultralytics.models.yolo
 import ultralytics.utils.tal as _m
 
+import ultralytics.utils.loss
+
+# Required to fix errors stemming from training models on
+# newer versions of ultralytics, but still using the old
+# versioned docker image on the edge. Ultralytics removes
+# the DFLoss class in newer versions.
+class DFLoss:
+    pass
+
+ultralytics.utils.loss.DFLoss = DFLoss
+
 sys.modules['ultralytics.yolo'] = ultralytics.models.yolo
 sys.modules['ultralytics.yolo.utils'] = ultralytics.utils
 
