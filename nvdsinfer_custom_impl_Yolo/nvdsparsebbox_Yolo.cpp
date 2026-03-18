@@ -23,6 +23,7 @@
  * https://www.github.com/marcoslucianops
  */
 
+#include <cmath>
 #include "nvdsinfer_custom_impl.h"
 
 #include "utils.h"
