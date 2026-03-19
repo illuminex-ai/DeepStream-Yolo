@@ -13,6 +13,7 @@ import ultralytics.utils.tal as _m
 # newer versions of ultralytics, but still using the old
 # versioned docker image on the edge. Ultralytics removes
 # the DFLoss class in newer versions.
+# We went upgraded the training image from 8.2.35 to 8.3.162
 import ultralytics.utils.loss
 
 class DFLoss:
