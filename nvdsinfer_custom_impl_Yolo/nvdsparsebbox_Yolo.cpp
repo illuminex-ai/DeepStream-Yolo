@@ -23,6 +23,7 @@
  * https://www.github.com/marcoslucianops
  */
 
+#include <cmath>
 #include "nvdsinfer_custom_impl.h"
 
 #include "utils.h"
@@ -76,11 +77,30 @@ decodeTensorYolo(const float* output, const uint& outputSize, const uint& netW, 
   std::vector<NvDsInferParseObjectInfo> binfo;
 
   for (uint b = 0; b < outputSize; ++b) {
-    float maxProb = output[b * 6 + 4];
-    int maxIndex = (int) output[b * 6 + 5];
+    float maxProb = output[b * 6 + 4];  
 
+    // 1. Skip if probability is -inf, NaN, or 0
+    if (std::isinf(maxProb) || std::isnan(maxProb) || maxProb <= 0.0f) {
+        continue;
+    }
+
+    // 2. Safely handle the class index
+    int numClasses = preclusterThreshold.size();
+    float rawClassIdx = output[b * 6 + 5];
+    int maxIndex = 0;
+
+    if (numClasses > 1) {
+        // Only cast to int if it's a reasonably small number
+        if (rawClassIdx >= 0 && rawClassIdx < numClasses) {
+            maxIndex = (int)rawClassIdx;
+        } else {
+            continue; // Skip the row if class index is 2147483647 or garbage
+        }
+    }
+
+    // 3. Check threshold
     if (maxProb < preclusterThreshold[maxIndex]) {
-      continue;
+        continue;
     }
 
     float bx1 = output[b * 6 + 0];
