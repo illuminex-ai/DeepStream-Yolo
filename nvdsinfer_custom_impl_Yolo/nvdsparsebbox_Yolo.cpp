@@ -76,8 +76,6 @@ decodeTensorYolo(const float* output, const uint& outputSize, const uint& netW, 
   std::vector<NvDsInferParseObjectInfo> binfo;
 
   for (uint b = 0; b < outputSize; ++b) {
-    std::cout << "Debug: b=" << b << " maxIndex=" << (int)output[b * 6 + 5] << " VectorSize=" << preclusterThreshold.size() << std::endl;
-    
     float maxProb = output[b * 6 + 4];
     int maxIndex = (int) output[b * 6 + 5];
 
